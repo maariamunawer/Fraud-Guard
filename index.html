@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FraudGuard — Shipment Detection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --bg:        #0b0e14;
+      --bg2:       #111520;
+      --bg3:       #181d2a;
+      --surface:   #1e2435;
+      --surface2:  #252c3e;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.13);
+      --text:      #e8eaf0;
+      --text2:     #8a90a2;
+      --text3:     #555e72;
+      --amber:     #f5a623;
+      --amber-dim: rgba(245,166,35,0.12);
+      --amber-glow:rgba(245,166,35,0.25);
+      --red:       #e05252;
+      --red-dim:   rgba(224,82,82,0.12);
+      --green:     #4caf82;
+      --green-dim: rgba(76,175,130,0.12);
+      --blue:      #5b8dee;
+      --blue-dim:  rgba(91,141,238,0.12);
+      --mono:      'Space Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+      --radius:    10px;
+      --radius-lg: 14px;
+      --sidebar-w: 220px;
+      --ease:      cubic-bezier(0.16,1,0.3,1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+
+    /* ── Layout ── */
+    .shell { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-mark {
+      width: 32px; height: 32px;
+      background: var(--amber);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .logo-name {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.03em;
+    }
+
+    .logo-sub {
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .sidebar-nav { padding: 16px 12px; flex: 1; }
+
+    .nav-label {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text3);
+      padding: 0 8px;
+      margin-bottom: 6px;
+      font-family: var(--mono);
+    }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px;
+      border-radius: var(--radius);
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 400;
+      cursor: pointer;
+      margin-bottom: 2px;
+      transition: all 200ms var(--ease);
+      text-decoration: none;
+    }
+    .nav-item:hover { background: var(--surface); color: var(--text); }
+    .nav-item.active {
+      background: var(--amber-dim);
+      color: var(--amber);
+      border: 1px solid rgba(245,166,35,0.2);
+    }
+    .nav-icon { font-size: 15px; width: 20px; text-align: center; }
+
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+
+    /* ── Main ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+
+    .topbar-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.03em;
+    }
+
+    .topbar-meta {
+      display: flex; align-items: center; gap: 16px;
+    }
+
+    .status-dot {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    /* ── Content area ── */
+    .content { padding: 28px 32px; flex: 1; }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: border-color 250ms var(--ease);
+    }
+    .stat-card:hover { border-color: var(--border2); }
+
+    .stat-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .stat-icon.amber { background: var(--amber-dim); }
+    .stat-icon.red   { background: var(--red-dim); }
+    .stat-icon.green { background: var(--green-dim); }
+    .stat-icon.blue  { background: var(--blue-dim); }
+
+    .stat-val {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+    .stat-lbl {
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Main grid ── */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title-icon { font-size: 14px; }
+
+    .card-badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 700;
+    }
+    .badge-neutral { background: var(--surface2); color: var(--text2); }
+    .badge-red     { background: var(--red-dim);  color: var(--red); border: 1px solid rgba(224,82,82,0.25); }
+    .badge-green   { background: var(--green-dim);color: var(--green); border: 1px solid rgba(76,175,130,0.25); }
+
+    .card-body { padding: 22px; }
+
+    /* ── Upload zone ── */
+    .drop-zone {
+      border: 1.5px dashed var(--border2);
+      border-radius: var(--radius);
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 250ms var(--ease);
+      position: relative;
+    }
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--amber);
+      background: var(--amber-dim);
+    }
+
+    .drop-zone input[type="file"] { display: none; } /* BUG FIX: hidden input */
+
+    .drop-icon { font-size: 32px; margin-bottom: 10px; }
+    .drop-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+    .drop-hint  { font-size: 12px; color: var(--text3); }
+
+    .file-chosen {
+      margin-top: 14px;
+      background: var(--green-dim);
+      border: 1px solid rgba(76,175,130,0.25);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--green);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      word-break: break-all;
+    }
+
+    /* ── Config sliders ── */
+    .config-group { margin-top: 18px; }
+    .config-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 6px;
+      font-family: var(--mono);
+    }
+    .config-val { color: var(--amber); }
+
+    input[type=range] {
+      width: 100%;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface2);
+      outline: none;
+      margin-bottom: 16px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--amber);
+      cursor: pointer;
+      box-shadow: 0 0 6px var(--amber-glow);
+    }
+
+    /* ── Submit button ── */
+    .btn-analyze {
+      width: 100%;
+      margin-top: 6px;
+      padding: 13px;
+      background: var(--amber);
+      color: #0b0e14;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 200ms var(--ease);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-analyze:hover { background: #ffb733; box-shadow: 0 0 20px var(--amber-glow); }
+    .btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Error ── */
+    .error-box {
+      margin-top: 14px;
+      background: var(--red-dim);
+      border: 1px solid rgba(224,82,82,0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--red);
+      display: none;
+    }
+
+    /* ── Results table ── */
+    .table-wrap {
+      overflow-x: auto;
+      max-height: 540px;
+      overflow-y: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    thead { position: sticky; top: 0; z-index: 10; }
+    thead tr {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border2);
+    }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text3);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 150ms;
+    }
+    tbody tr:hover { background: var(--bg3); }
+    tbody tr:last-child { border-bottom: none; }
+
+    td {
+      padding: 10px 14px;
+      color: var(--text);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .td-mono {
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .risk-pill {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      letter-spacing: 0.05em;
+    }
+    .risk-critical { background: rgba(224,82,82,0.18); color: #ff7070; border: 1px solid rgba(224,82,82,0.3); }
+    .risk-high     { background: rgba(245,166,35,0.15); color: #f5a623; border: 1px solid rgba(245,166,35,0.3); }
+    .risk-medium   { background: rgba(91,141,238,0.15); color: #7daaf0; border: 1px solid rgba(91,141,238,0.3); }
+    .risk-low      { background: rgba(76,175,130,0.15); color: #4caf82; border: 1px solid rgba(76,175,130,0.3); }
+
+    .status-pill {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+    }
+    .status-fraud  { background: var(--red-dim); color: var(--red); border: 1px solid rgba(224,82,82,0.25); }
+    .status-normal { background: var(--green-dim); color: var(--green); border: 1px solid rgba(76,175,130,0.25); }
+
+    /* ── Empty / loading state ── */
+    .empty-state {
+      padding: 60px 20px;
+      text-align: center;
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
+    .empty-text { color: var(--text3); font-size: 13px; }
+
+    /* ── Score bar ── */
+    .score-wrap { display: flex; align-items: center; gap: 8px; }
+    .score-bar-bg {
+      width: 60px; height: 4px;
+      background: var(--surface2);
+      border-radius: 2px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 400ms var(--ease);
+    }
+    .score-num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text2);
+      min-width: 44px;
+    }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      position: fixed; inset: 0;
+      background: rgba(11,14,20,0.85);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .loading-overlay.show { display: flex; }
+
+    .loading-box {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 40px 48px;
+      text-align: center;
+      min-width: 320px;
+    }
+
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid var(--surface2);
+      border-top-color: var(--amber);
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-title {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .loading-sub { font-size: 12px; color: var(--text3); margin-bottom: 24px; }
+
+    .progress-track {
+      height: 4px;
+      background: var(--surface2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      /* BUG FIX: --color-primary-gradient was undefined; now defined inline */
+      background: linear-gradient(90deg, var(--amber), #ffcc66);
+      border-radius: 2px;
+      animation: prog 2.2s ease-in-out infinite;
+    }
+    @keyframes prog {
+      0%   { width: 0%;   margin-left: 0; }
+      60%  { width: 70%;  margin-left: 0; }
+      100% { width: 0%;   margin-left: 100%; }
+    }
+
+    /* ── Separator ── */
+    .sep {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+
+    /* ── Filter tabs ── */
+    .filter-row {
+      display: flex; gap: 6px;
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .filter-tab {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text2);
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: all 150ms;
+    }
+    .filter-tab:hover { border-color: var(--amber); color: var(--amber); }
+    .filter-tab.active {
+      background: var(--amber-dim);
+      border-color: rgba(245,166,35,0.4);
+      color: var(--amber);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 1100px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 700px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .content { padding: 16px; }
+      .topbar { padding: 12px 16px; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ── Entry animations ── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(12px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .stat-card  { animation: fadeUp 400ms var(--ease) both; }
+    .stat-card:nth-child(1) { animation-delay: 60ms; }
+    .stat-card:nth-child(2) { animation-delay: 120ms; }
+    .stat-card:nth-child(3) { animation-delay: 180ms; }
+    .stat-card:nth-child(4) { animation-delay: 240ms; }
+    .card       { animation: fadeUp 450ms var(--ease) 200ms both; }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">🛡</div>
+      <div>
+        <div class="logo-name">FraudGuard</div>
+        <div class="logo-sub">Delhivery Analysis</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item active" href="#">
+        <span class="nav-icon">⬡</span> Dashboard
+      </a>
+      <a class="nav-item" href="#" onclick="return false">
+        <span class="nav-icon">◎</span> History
+      </a>
+      <a class="nav-item" href="#" onclick="return false">
+        <span class="nav-icon">◈</span> Settings
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      v1.0 · IsolationForest<br>
+      Python 3.7 backend
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <div class="topbar">
+      <span class="topbar-title">SHIPMENT ANOMALY DETECTION</span>
+      <div class="topbar-meta">
+        <div class="status-dot"><span class="dot"></span> Backend ready</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon amber">📂</div>
+          <div>
+            <div class="stat-val" id="statFiles">0</div>
+            <div class="stat-lbl">Files processed</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red">🚨</div>
+          <div>
+            <div class="stat-val" id="statAnomalies">0</div>
+            <div class="stat-lbl">Anomalies found</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">✅</div>
+          <div>
+            <div class="stat-val" id="statNormal">0</div>
+            <div class="stat-lbl">Normal shipments</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">📊</div>
+          <div>
+            <div class="stat-val" id="statRate">—</div>
+            <div class="stat-lbl">Fraud rate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main grid -->
+      <div class="grid-2">
+
+        <!-- Upload panel -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title"><span class="card-title-icon">⬆</span> Upload CSV</span>
+            <span class="card-badge badge-neutral" id="uploadStatus">IDLE</span>
+          </div>
+          <div class="card-body">
+
+            <label class="drop-zone" id="dropZone" for="csvFile">
+              <div class="drop-icon">📄</div>
+              <div class="drop-title">Drop CSV here or click to browse</div>
+              <div class="drop-hint">Delhivery format · 10 MB max</div>
+              <input type="file" id="csvFile" accept=".csv" />
+            </label>
+
+            <div class="file-chosen" id="fileChosen">
+              ✓ <span id="fileChosenName"></span>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="config-group">
+              <div class="config-label">
+                Contamination rate
+                <span class="config-val" id="contamVal">5%</span>
+              </div>
+              <input type="range" id="contamSlider" min="1" max="20" value="5"
+                oninput="document.getElementById('contamVal').textContent=this.value+'%'">
+
+              <div class="config-label">
+                Max rows shown
+                <span class="config-val" id="rowsVal">100</span>
+              </div>
+              <input type="range" id="rowsSlider" min="10" max="500" step="10" value="100"
+                oninput="document.getElementById('rowsVal').textContent=this.value">
+            </div>
+
+            <button class="btn-analyze" id="btnAnalyze" disabled>
+              ⬡ Analyze Shipments
+            </button>
+
+            <div class="error-box" id="errorBox" role="alert"></div>
+          </div>
+        </div>
+
+        <!-- Results panel -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title"><span class="card-title-icon">◉</span> Detection Results</span>
+            <span class="card-badge badge-neutral" id="resultsBadge">NO DATA</span>
+          </div>
+
+          <div class="filter-row" id="filterRow" style="display:none">
+            <button class="filter-tab active" onclick="applyFilter('all',this)">All</button>
+            <button class="filter-tab" onclick="applyFilter('fraud',this)">Fraud only</button>
+            <button class="filter-tab" onclick="applyFilter('normal',this)">Normal only</button>
+          </div>
+
+          <div class="table-wrap">
+            <table aria-label="Shipment fraud detection results">
+              <thead>
+                <tr>
+                  <th>Trip UUID</th>
+                  <th>Route</th>
+                  <th>Score</th>
+                  <th>Risk</th>
+                  <th>Flags</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody">
+                <tr>
+                  <td colspan="6">
+                    <div class="empty-state">
+                      <div class="empty-icon">◎</div>
+                      <div class="empty-text">Upload a CSV file to begin detection</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /grid-2 -->
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div class="loading-title">Analyzing Shipments</div>
+    <div class="loading-sub">Running IsolationForest model…</div>
+    <div class="progress-track"><div class="progress-fill"></div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const dropZone       = document.getElementById('dropZone');
+const csvFile        = document.getElementById('csvFile');
+const fileChosen     = document.getElementById('fileChosen');
+const fileChosenName = document.getElementById('fileChosenName');
+const btnAnalyze     = document.getElementById('btnAnalyze');
+const errorBox       = document.getElementById('errorBox');
+const tableBody      = document.getElementById('tableBody');
+const filterRow      = document.getElementById('filterRow');
+const resultsBadge   = document.getElementById('resultsBadge');
+const uploadStatus   = document.getElementById('uploadStatus');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const statFiles      = document.getElementById('statFiles');
+const statAnomalies  = document.getElementById('statAnomalies');
+const statNormal     = document.getElementById('statNormal');
+const statRate       = document.getElementById('statRate');
+
+let allRows = [];
+
+// ── File selection ────────────────────────────────────────────────────────────
+csvFile.addEventListener('change', onFileSelected);
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) { csvFile.files = e.dataTransfer.files; onFileSelected(); }
+});
+
+function onFileSelected() {
+  const file = csvFile.files[0];
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.csv')) { showError('Only .csv files are supported.'); return; }
+  fileChosenName.textContent = file.name;
+  fileChosen.style.display = 'flex';
+  btnAnalyze.disabled = false;
+  clearError();
+  uploadStatus.textContent = 'READY';
+  uploadStatus.className = 'card-badge badge-green';
+}
+
+// ── Analyze button ────────────────────────────────────────────────────────────
+btnAnalyze.addEventListener('click', async () => {
+  const file = csvFile.files[0];
+  if (!file) { showError('Please select a CSV file first.'); return; }
+
+  clearError();
+  showLoading();
+  btnAnalyze.disabled = true;
+  uploadStatus.textContent = 'PROCESSING';
+  uploadStatus.className = 'card-badge badge-neutral';
+
+  // Yield to browser so loading overlay paints before heavy computation
+  await new Promise(r => setTimeout(r, 60));
+
+  try {
+    const text = await file.text();
+    const contamination = parseInt(document.getElementById('contamSlider').value) / 100;
+    const results = runIsolationForest(text, contamination);
+
+    allRows = results;
+    renderTable(allRows, 'all');
+    updateStats(allRows);
+    statFiles.textContent = (parseInt(statFiles.textContent) || 0) + 1;
+
+    const fraudCount = allRows.filter(r => r.isolation_anomaly === 1).length;
+    resultsBadge.textContent = `${fraudCount} FLAGGED`;
+    resultsBadge.className = 'card-badge badge-red';
+    filterRow.style.display = 'flex';
+    uploadStatus.textContent = 'DONE';
+    uploadStatus.className = 'card-badge badge-green';
+
+  } catch (err) {
+    console.error(err);
+    showError('Error: ' + err.message);
+    uploadStatus.textContent = 'FAILED';
+    uploadStatus.className = 'card-badge badge-red';
+  } finally {
+    hideLoading();
+    btnAnalyze.disabled = false;
+  }
+});
+
+// ── In-browser IsolationForest ────────────────────────────────────────────────
+// A faithful JS port of sklearn's IsolationForest decision_function logic.
+// Uses random binary trees (isolation trees) to score each sample.
+
+function runIsolationForest(csvText, contamination = 0.05) {
+  // 1. Parse CSV
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true, dynamicTyping: true });
+  if (!parsed.data.length) throw new Error('CSV is empty or could not be parsed.');
+  const rows = parsed.data;
+
+  // 2. Engineer features (mirrors fraud_detection.py exactly)
+  const FEATURES = [
+    'delivery_time_hours', 'actual_time', 'osrm_time',
+    'actual_distance_to_destination', 'osrm_distance',
+    'factor', 'segment_factor', 'is_cutoff',
+    'duplicate_flag', 'same_city'
+  ];
+
+  // Coerce is_cutoff TRUE/FALSE strings → 1/0
+  rows.forEach(r => {
+    if (r.is_cutoff === 'TRUE' || r.is_cutoff === true)  r.is_cutoff = 1;
+    if (r.is_cutoff === 'FALSE'|| r.is_cutoff === false) r.is_cutoff = 0;
+    // Duplicate flag: mark within-batch duplicates on trip_uuid
+  });
+
+  // Compute duplicate_flag if not already numeric
+  const uuidCount = {};
+  rows.forEach(r => { const k = r.trip_uuid||''; uuidCount[k] = (uuidCount[k]||0)+1; });
+  rows.forEach(r => {
+    if (typeof r.duplicate_flag !== 'number')
+      r.duplicate_flag = (uuidCount[r.trip_uuid||''] > 1) ? 1 : 0;
+  });
+
+  // same_city
+  rows.forEach(r => {
+    if (typeof r.same_city !== 'number')
+      r.same_city = (String(r.source_center||'').toLowerCase() ===
+                     String(r.destination_center||'').toLowerCase()) ? 1 : 0;
+  });
+
+  // Build numeric matrix, fill NaN with 0
+  let X = rows.map(r => FEATURES.map(f => {
+    const v = parseFloat(r[f]);
+    return isNaN(v) ? 0 : v;
+  }));
+
+  // 3. Standardise (z-score per column)
+  const n = X.length, p = FEATURES.length;
+  const means = new Array(p).fill(0);
+  const stds  = new Array(p).fill(1);
+  for (let j = 0; j < p; j++) {
+    let sum = 0; for (let i = 0; i < n; i++) sum += X[i][j];
+    means[j] = sum / n;
+    let ss = 0; for (let i = 0; i < n; i++) ss += (X[i][j] - means[j]) ** 2;
+    stds[j] = Math.sqrt(ss / n) || 1;
+  }
+  X = X.map(row => row.map((v, j) => (v - means[j]) / stds[j]));
+
+  // 4. Build isolation forest (200 trees, subsample 256)
+  const N_TREES = 200, SUB = Math.min(256, n);
+  const MAX_DEPTH = Math.ceil(Math.log2(SUB));
+
+  // Seeded PRNG (mulberry32) for reproducibility
+  let seed = 42;
+  const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+
+  function buildTree(indices, depth) {
+    if (indices.length <= 1 || depth >= MAX_DEPTH)
+      return { isLeaf: true, size: indices.length };
+    // Random feature and split value
+    const feat  = Math.floor(rand() * p);
+    const vals  = indices.map(i => X[i][feat]);
+    const mn    = Math.min(...vals), mx = Math.max(...vals);
+    if (mn === mx) return { isLeaf: true, size: indices.length };
+    const split = mn + rand() * (mx - mn);
+    const left  = indices.filter(i => X[i][feat] < split);
+    const right = indices.filter(i => X[i][feat] >= split);
+    return { isLeaf: false, feat, split,
+      left:  buildTree(left,  depth + 1),
+      right: buildTree(right, depth + 1) };
+  }
+
+  // c(n): average path length of unsuccessful BST search (sklearn formula)
+  const c = sz => sz <= 1 ? 0 : 2 * (Math.log(sz - 1) + 0.5772156649) - 2 * (sz - 1) / sz;
+
+  function pathLength(node, x, depth) {
+    if (node.isLeaf) return depth + c(node.size);
+    return x[node.feat] < node.split
+      ? pathLength(node.left,  x, depth + 1)
+      : pathLength(node.right, x, depth + 1);
+  }
+
+  // Build all trees
+  const trees = [];
+  for (let t = 0; t < N_TREES; t++) {
+    const idx = [];
+    const pool = Array.from({ length: n }, (_, i) => i);
+    for (let s = 0; s < SUB; s++) {
+      const r = Math.floor(rand() * (pool.length - s)) + s;
+      [pool[s], pool[r]] = [pool[r], pool[s]];
+      idx.push(pool[s]);
+    }
+    trees.push(buildTree(idx, 0));
+  }
+
+  // 5. Score each point: anomaly_score = -2^(-mean_path / c(SUB))
+  //    decision_function = -anomaly_score - 0.5  (sklearn convention)
+  const cSub = c(SUB);
+  const scores = X.map(x => {
+    const avgPath = trees.reduce((sum, tree) => sum + pathLength(tree, x, 0), 0) / N_TREES;
+    const anomalyScore = Math.pow(2, -avgPath / cSub);
+    return -(anomalyScore) + 0.5;  // decision_function: positive = normal, negative = anomalous
+  });
+
+  // 6. Threshold: contamination-th percentile
+  const sorted = [...scores].sort((a, b) => a - b);
+  // sklearn: threshold = score at the contamination-th percentile from the bottom
+  // Real scores on this dataset: fraud < 0, normal > 0 (mean ~0.13)
+  // Use index = floor(contamination * n) clamped to valid range
+  const threshIdx = Math.max(0, Math.min(n - 1, Math.floor(contamination * n) - 1));
+  const threshold = sorted[threshIdx];
+
+  // 7. Attach scores back to rows
+  return rows.map((r, i) => ({
+    ...r,
+    isolation_score:   scores[i],
+    isolation_anomaly: scores[i] <= threshold ? 1 : 0,
+    Anomaly:           scores[i] <= threshold ? 'Fraud' : 'Normal',
+  }));
+}
+
+// ── Render table ──────────────────────────────────────────────────────────────
+function renderTable(data, filter) {
+  const maxRows = parseInt(document.getElementById('rowsSlider').value);
+  let rows = data;
+
+  if (filter === 'fraud')  rows = data.filter(r => r.isolation_anomaly === 1);
+  if (filter === 'normal') rows = data.filter(r => r.isolation_anomaly === 0);
+
+  rows = [...rows].sort((a, b) => {
+    if (a.isolation_anomaly !== b.isolation_anomaly)
+      return b.isolation_anomaly - a.isolation_anomaly;     // fraud first
+    return a.isolation_score - b.isolation_score;           // lowest score first
+  }).slice(0, maxRows);
+
+  if (!rows.length) {
+    tableBody.innerHTML = `<tr><td colspan="6"><div class="empty-state">
+      <div class="empty-icon">✓</div><div class="empty-text">No records match this filter</div>
+    </div></td></tr>`;
+    return;
+  }
+
+  tableBody.innerHTML = rows.map(row => {
+    const isFraud  = row.isolation_anomaly === 1;
+    const score    = parseFloat(row.isolation_score);
+    const risk     = getRiskLevel(score);
+    const riskCls  = { CRITICAL:'risk-critical', HIGH:'risk-high', MEDIUM:'risk-medium', LOW:'risk-low' }[risk];
+    const pct      = Math.max(0, Math.min(100, Math.round((score + 0.5) * 100)));
+    const barColor = isFraud ? 'var(--red)' : 'var(--green)';
+    const tripId   = (row.trip_uuid || row.tracking_id_auto || '—').replace('trip-','');
+    const src      = row.source_name      ? row.source_name.split(' (')[0]      : '—';
+    const dst      = row.destination_name ? row.destination_name.split(' (')[0] : '—';
+    const route    = src !== '—' ? `${src} → ${dst}` : '—';
+    const dupFlag  = row.duplicate_flag === 1 ? '⚑ DUP'  : '';
+    const sameCity = row.same_city      === 1 ? '⚑ SAME' : '';
+    const flags    = [dupFlag, sameCity].filter(Boolean).join(' ');
+
+    return `<tr>
+      <td class="td-mono" title="${row.trip_uuid||''}"
+          style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${tripId}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;color:var(--text2);font-size:11px">${route}</td>
+      <td>
+        <div class="score-wrap">
+          <div class="score-bar-bg">
+            <div class="score-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+          </div>
+          <span class="score-num">${score.toFixed(3)}</span>
+        </div>
+      </td>
+      <td><span class="risk-pill ${riskCls}">${risk}</span></td>
+      <td class="td-mono" style="color:${flags?'var(--amber)':'var(--text3)'};font-size:10px">${flags||'—'}</td>
+      <td><span class="status-pill ${isFraud?'status-fraud':'status-normal'}">${isFraud?'⚠ FRAUD':'✓ NORMAL'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function getRiskLevel(score) {
+  // Bands calibrated to real score distribution: fraud < 0, normal 0..0.21
+  if (score < -0.12) return 'CRITICAL';
+  if (score < -0.06) return 'HIGH';
+  if (score <  0.00) return 'MEDIUM';
+  return 'LOW';
+}
+
+function updateStats(data) {
+  const fraudCount  = data.filter(r => r.isolation_anomaly === 1).length;
+  const normalCount = data.length - fraudCount;
+  statAnomalies.textContent = fraudCount;
+  statNormal.textContent    = normalCount;
+  statRate.textContent      = data.length ? ((fraudCount / data.length) * 100).toFixed(1) + '%' : '—';
+}
+
+// ── Filter tabs ───────────────────────────────────────────────────────────────
+function applyFilter(type, btn) {
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable(allRows, type);
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function showLoading() { loadingOverlay.classList.add('show'); }
+function hideLoading() { loadingOverlay.classList.remove('show'); }
+function showError(msg) { errorBox.textContent = msg; errorBox.style.display = 'block'; }
+function clearError()   { errorBox.style.display = 'none'; errorBox.textContent = ''; }
+</script>
+</body>
+</html>
