@@ -539,7 +539,6 @@
     }
     .progress-fill {
       height: 100%;
-      /* BUG FIX: --color-primary-gradient was undefined; now defined inline */
       background: linear-gradient(90deg, var(--amber), #ffcc66);
       border-radius: 2px;
       animation: prog 2.2s ease-in-out infinite;
@@ -873,9 +872,7 @@ btnAnalyze.addEventListener('click', async () => {
   }
 });
 
-// ── In-browser IsolationForest ────────────────────────────────────────────────
-// A faithful JS port of sklearn's IsolationForest decision_function logic.
-// Uses random binary trees (isolation trees) to score each sample.
+
 
 function runIsolationForest(csvText, contamination = 0.05) {
   // 1. Parse CSV
