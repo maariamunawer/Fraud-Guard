@@ -1,13 +1,3 @@
-"""
-app.py — Fixed version
-Fixes applied:
-  1. /upload accepts BOTH base64 JSON (from browser iframe) AND multipart form-data
-  2. .csv extension validated before touching disk
-  3. detect_fraud() wrapped in try/except — structured JSON error on failure
-  4. /results GET uses most-recent file — no hardcoded name mismatch
-  5. CORS enabled for all origins
-"""
-
 import base64
 import os
 
@@ -33,11 +23,7 @@ def home():
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
-    """
-    Accepts two content types:
-      - application/json  -> { filename, file (base64), contamination }
-      - multipart/form-data -> file field + contamination field
-    """
+
 
     if request.is_json:
         payload       = request.get_json(force=True)
