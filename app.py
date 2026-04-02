@@ -1,6 +1,5 @@
 import base64
 import os
-
 import pandas as pd
 from backend import detect_fraud
 from flask import Flask, jsonify, request, send_from_directory
