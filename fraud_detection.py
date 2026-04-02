@@ -1,18 +1,9 @@
-"""
-fraud_detection.py — Fixed version
-Fixes applied:
-  1. is_cutoff added to extra_features (was in features list but never created → KeyError)
-  2. All feature columns guaranteed to exist before building X
-  3. count_hub_scans kept but noted as unused
-  4. simulate_labels branch left as stub with clear comment
-"""
-
 import argparse
 import os
 import pandas as pd
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')   # non-interactive backend — safe for Flask
+matplotlib.use('Agg')   
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
@@ -81,7 +72,6 @@ def main(args):
         df["same_city"] = 0
 
     # ── Extra numeric features ────────────────────────────────────────────────
-    # BUG FIX: is_cutoff was in `features` but never created; added here
     extra_features = [
         "actual_distance_to_destination",
         "actual_time",
@@ -92,7 +82,7 @@ def main(args):
         "segment_osrm_time",
         "segment_osrm_distance",
         "segment_factor",
-        "is_cutoff",          # ← FIXED: was missing, caused KeyError
+        "is_cutoff",         
     ]
     for col in extra_features:
         if col not in df.columns:
@@ -116,7 +106,6 @@ def main(args):
         "same_city",
     ]
 
-    # BUG FIX: guarantee every feature column exists before slicing
     for col in features:
         if col not in df.columns:
             df[col] = 0
